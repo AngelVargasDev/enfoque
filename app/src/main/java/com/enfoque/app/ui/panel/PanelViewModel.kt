@@ -4,11 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.enfoque.app.data.preferencias.PreferenciasApp
 import com.enfoque.app.di.ContenedorApp
 import com.enfoque.app.domain.model.CategoriaTarea
 import com.enfoque.app.domain.model.EstadoTarea
+import com.enfoque.app.domain.model.Racha
 import com.enfoque.app.domain.model.Tarea
 import com.enfoque.app.domain.model.TareaRecurrente
+import com.enfoque.app.domain.repository.RachaRepository
 import com.enfoque.app.domain.repository.TareaRepository
 import com.enfoque.app.domain.temporizador.Temporizador
 import kotlinx.coroutines.delay
@@ -33,7 +36,9 @@ import java.time.LocalDateTime
  */
 class PanelViewModel(
     private val tareas: TareaRepository,
+    private val racha: RachaRepository,
     private val temporizador: Temporizador,
+    private val preferencias: PreferenciasApp,
 ) : ViewModel() {
 
     private val _eventos = MutableSharedFlow<String>(extraBufferCapacity = 4)
@@ -44,9 +49,10 @@ class PanelViewModel(
     val estado: StateFlow<PanelUiState> = combine(
         tareas.observarTareas(),
         tareas.observarRecurrentes(),
+        racha.observarDias(),
         diaActual,
-    ) { lista, rutinas, dia ->
-        construirEstado(lista, rutinas, dia)
+    ) { lista, rutinas, diasCompletados, dia ->
+        construirEstado(lista, rutinas, diasCompletados, dia)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000L),
@@ -57,6 +63,12 @@ class PanelViewModel(
         // Mantiene el tablero al día si la app queda abierta pasada la medianoche
         // y promueve a Hoy las tareas preparadas para el día anterior.
         viewModelScope.launch {
+            // Si la app murió mientras corría un temporizador, no debe quedar una
+            // tarea "En curso" para siempre. Se respeta una sesión realmente viva.
+            if (!temporizador.haySesionActiva()) {
+                tareas.reiniciarTareasEnProgreso()
+            }
+
             while (isActive) {
                 val ahora = LocalDateTime.now()
                 diaActual.value = ahora.toLocalDate()
@@ -103,6 +115,10 @@ class PanelViewModel(
         val nuevoEstado = if (tarea.estaCompletada) EstadoTarea.PENDIENTE else EstadoTarea.COMPLETADA
         viewModelScope.launch {
             tareas.cambiarEstado(tarea.id, nuevoEstado)
+            if (nuevoEstado == EstadoTarea.COMPLETADA) {
+                racha.registrarHoy()
+                temporizador.detenerPomodoroSiEs(tarea.id)
+            }
             _eventos.tryEmit(if (nuevoEstado == EstadoTarea.COMPLETADA) "Tarea completada" else "Tarea reabierta")
         }
     }
@@ -147,20 +163,34 @@ class PanelViewModel(
             _eventos.tryEmit("Asigna una duración válida para iniciar el temporizador")
             return
         }
-        if (!tarea.estaCompletada) {
-            viewModelScope.launch {
-                // Solo hay un temporizador activo: cualquier tarea que hubiera
-                // quedado EN_PROGRESO vuelve a PENDIENTE antes de marcar la nueva.
-                tareas.reiniciarTareasEnProgreso()
-                tareas.cambiarEstado(tarea.id, EstadoTarea.EN_PROGRESO)
-            }
-        }
+        marcarEnProgreso(tarea)
         _eventos.tryEmit("Temporizador iniciado: ${tarea.duracionMinutos} min")
+    }
+
+    fun iniciarPomodoro(tarea: Tarea) {
+        val ajustes = preferencias.ajustes.value.pomodoro
+        if (!temporizador.iniciarPomodoro(tarea, ajustes)) {
+            _eventos.tryEmit("No se pudo iniciar el Pomodoro")
+            return
+        }
+        marcarEnProgreso(tarea)
+        _eventos.tryEmit("Pomodoro iniciado: ${ajustes.minutosEnfoque} min de enfoque")
+    }
+
+    private fun marcarEnProgreso(tarea: Tarea) {
+        if (tarea.estaCompletada) return
+        viewModelScope.launch {
+            // Solo hay un temporizador activo: cualquier tarea que hubiera
+            // quedado EN_PROGRESO vuelve a PENDIENTE antes de marcar la nueva.
+            tareas.reiniciarTareasEnProgreso()
+            tareas.cambiarEstado(tarea.id, EstadoTarea.EN_PROGRESO)
+        }
     }
 
     private fun construirEstado(
         lista: List<Tarea>,
         rutinas: List<TareaRecurrente>,
+        diasCompletados: List<LocalDate>,
         dia: LocalDate,
     ): PanelUiState {
         val manana = dia.plusDays(1)
@@ -194,7 +224,31 @@ class PanelViewModel(
                 )
             },
             recordatoriosActivos = lista.count { !it.estaCompletada && it.horaRecordatorio != null },
+            racha = calcularRacha(diasCompletados, dia),
         )
+    }
+
+    private fun calcularRacha(dias: List<LocalDate>, hoy: LocalDate): Racha {
+        val conjunto = dias.toSet()
+        val hoyCompletado = hoy in conjunto
+
+        var cursor = if (hoyCompletado) hoy else hoy.minusDays(1)
+        var actual = 0
+        while (cursor in conjunto) {
+            actual++
+            cursor = cursor.minusDays(1)
+        }
+
+        var mejor = 0
+        var corrida = 0
+        var anterior: LocalDate? = null
+        for (fecha in conjunto.sorted()) {
+            corrida = if (anterior != null && fecha == anterior.plusDays(1)) corrida + 1 else 1
+            mejor = maxOf(mejor, corrida)
+            anterior = fecha
+        }
+
+        return Racha(actual = actual, mejor = mejor, hoyCompletado = hoyCompletado)
     }
 
     companion object {
@@ -202,7 +256,9 @@ class PanelViewModel(
             initializer {
                 PanelViewModel(
                     tareas = contenedor.tareas,
+                    racha = contenedor.racha,
                     temporizador = contenedor.temporizador,
+                    preferencias = contenedor.preferencias,
                 )
             }
         }

@@ -9,8 +9,12 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [TareaEntity::class, TareaRecurrenteEntity::class],
-    version = 2,
+    entities = [
+        TareaEntity::class,
+        TareaRecurrenteEntity::class,
+        DiaCompletadoEntity::class,
+    ],
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Convertidores::class)
@@ -19,6 +23,8 @@ abstract class EnfoqueDatabase : RoomDatabase() {
     abstract fun tareaDao(): TareaDao
 
     abstract fun tareaRecurrenteDao(): TareaRecurrenteDao
+
+    abstract fun rachaDao(): RachaDao
 
     companion object {
         private const val NOMBRE = "enfoque.db"
@@ -49,9 +55,28 @@ abstract class EnfoqueDatabase : RoomDatabase() {
             }
         }
 
+        /** Añade el modo Pomodoro por tarea y la tabla de días para la racha. */
+        val MIGRACION_2_3 = object : Migration(2, 3) {
+            override fun migrate(baseDeDatos: SupportSQLiteDatabase) {
+                baseDeDatos.execSQL("ALTER TABLE tareas ADD COLUMN usarPomodoro INTEGER NOT NULL DEFAULT 0")
+                baseDeDatos.execSQL(
+                    "ALTER TABLE tareas_recurrentes ADD COLUMN usarPomodoro INTEGER NOT NULL DEFAULT 0",
+                )
+                baseDeDatos.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `dias_completados` (
+                        `fecha` INTEGER NOT NULL,
+                        `creadaEn` INTEGER NOT NULL,
+                        PRIMARY KEY(`fecha`)
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
         fun construir(context: Context): EnfoqueDatabase =
             Room.databaseBuilder(context, EnfoqueDatabase::class.java, NOMBRE)
-                .addMigrations(MIGRACION_1_2)
+                .addMigrations(MIGRACION_1_2, MIGRACION_2_3)
                 .build()
     }
 }

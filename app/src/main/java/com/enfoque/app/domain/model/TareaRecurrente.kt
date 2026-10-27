@@ -15,6 +15,8 @@ data class TareaRecurrente(
     val descripcion: String = "",
     /** Duración opcional del bloque de enfoque. */
     val duracionMinutos: Int? = null,
+    /** Si las tareas generadas por esta rutina usan Pomodoro. */
+    val usarPomodoro: Boolean = false,
     /** Hora del recordatorio. `null` significa que la rutina no avisa. */
     val horaRecordatorio: LocalTime? = LocalTime.of(9, 0),
     val creadaEn: Long = System.currentTimeMillis(),

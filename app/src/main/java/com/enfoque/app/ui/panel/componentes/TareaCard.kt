@@ -56,6 +56,7 @@ fun TareaCard(
     tarea: Tarea,
     onCompletarCambio: () -> Unit,
     onIniciar: () -> Unit,
+    onIniciarPomodoro: () -> Unit,
     onMover: (CategoriaTarea) -> Unit,
     onEliminar: () -> Unit,
     modifier: Modifier = Modifier,
@@ -129,10 +130,19 @@ fun TareaCard(
                             },
                         )
                         tarea.duracionMinutos?.let { minutos ->
+                            if (!tarea.usarPomodoro) {
+                                Text(
+                                    "$minutos min",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        if (tarea.usarPomodoro) {
                             Text(
-                                "$minutos min",
+                                "Pomodoro",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = MaterialTheme.colorScheme.secondary,
                             )
                         }
                         tarea.horaRecordatorio?.let { hora ->
@@ -184,6 +194,31 @@ fun TareaCard(
                         )
                         HorizontalDivider()
                         DropdownMenuItem(
+                            text = { Text("Iniciar Pomodoro") },
+                            leadingIcon = {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                            },
+                            onClick = {
+                                menuAbierto = false
+                                onIniciarPomodoro()
+                            },
+                            enabled = !completada,
+                        )
+                        if (tarea.tieneTemporizador) {
+                            DropdownMenuItem(
+                                text = { Text("Iniciar temporizador simple") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                },
+                                onClick = {
+                                    menuAbierto = false
+                                    onIniciar()
+                                },
+                                enabled = !completada,
+                            )
+                        }
+                        HorizontalDivider()
+                        DropdownMenuItem(
                             text = { Text("Eliminar", color = MaterialTheme.colorScheme.error) },
                             leadingIcon = {
                                 Icon(
@@ -201,7 +236,7 @@ fun TareaCard(
                 }
             }
 
-            if (!completada && (accionRapida != null || tarea.tieneTemporizador)) {
+            if (!completada && (accionRapida != null || tarea.tieneTemporizador || tarea.usarPomodoro)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -229,7 +264,23 @@ fun TareaCard(
                         }
                     }
                     Spacer(Modifier.weight(1f))
-                    if (tarea.tieneTemporizador) {
+                    if (tarea.usarPomodoro) {
+                        TextButton(
+                            onClick = onIniciarPomodoro,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = "Pomodoro",
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                    } else if (tarea.tieneTemporizador) {
                         TextButton(
                             onClick = onIniciar,
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
@@ -268,6 +319,7 @@ private fun TareaCardPreview() {
             ),
             onCompletarCambio = {},
             onIniciar = {},
+            onIniciarPomodoro = {},
             onMover = {},
             onEliminar = {},
         )

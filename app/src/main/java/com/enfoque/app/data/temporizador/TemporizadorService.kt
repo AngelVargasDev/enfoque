@@ -33,6 +33,19 @@ class TemporizadorService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACCION_DETENER) {
+            trabajo?.cancel()
+            trabajo = null
+            SesionesTemporizador.activa(this)?.let { anterior ->
+                AlarmaTemporizador.cancelar(this, anterior.id)
+            }
+            SesionesTemporizador.limpiarActiva(this)
+            Notificaciones.cancelarEnCurso(this)
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         val sesionId = intent?.getStringExtra(EXTRA_SESION_ID)
         val titulo = intent?.getStringExtra(EXTRA_TITULO)
         val finEn = intent?.getLongExtra(EXTRA_FIN_EN, 0L) ?: 0L
@@ -95,6 +108,7 @@ class TemporizadorService : Service() {
     }
 
     companion object {
+        const val ACCION_DETENER = "com.enfoque.app.action.TEMPORIZADOR_DETENER"
         const val EXTRA_SESION_ID = "sesion_id"
         const val EXTRA_TAREA_ID = "tarea_id"
         const val EXTRA_TITULO = "titulo"

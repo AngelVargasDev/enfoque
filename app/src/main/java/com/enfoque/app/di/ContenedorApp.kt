@@ -3,18 +3,23 @@ package com.enfoque.app.di
 import android.content.Context
 import com.enfoque.app.data.calendario.CalendarioRepositoryNoOp
 import com.enfoque.app.data.local.EnfoqueDatabase
+import com.enfoque.app.data.preferencias.PreferenciasApp
 import com.enfoque.app.data.recordatorio.RecordatorioProgramador
+import com.enfoque.app.data.repository.RachaRepositoryImpl
 import com.enfoque.app.data.repository.TareaRepositoryImpl
 import com.enfoque.app.data.temporizador.TemporizadorAndroid
 import com.enfoque.app.domain.calendario.CalendarioRepository
+import com.enfoque.app.domain.repository.RachaRepository
 import com.enfoque.app.domain.repository.TareaRepository
 import com.enfoque.app.domain.temporizador.Temporizador
 
 /** Contenedor de dependencias manual, suficiente para esta fase y fácil de migrar a Hilt. */
 interface ContenedorApp {
     val tareas: TareaRepository
+    val racha: RachaRepository
     val temporizador: Temporizador
     val calendario: CalendarioRepository
+    val preferencias: PreferenciasApp
 }
 
 class ContenedorAppImpl(context: Context) : ContenedorApp {
@@ -32,7 +37,13 @@ class ContenedorAppImpl(context: Context) : ContenedorApp {
         )
     }
 
+    override val racha: RachaRepository by lazy {
+        RachaRepositoryImpl(dao = baseDeDatos.rachaDao())
+    }
+
     override val temporizador: Temporizador by lazy { TemporizadorAndroid(contexto) }
+
+    override val preferencias: PreferenciasApp by lazy { PreferenciasApp(contexto) }
 
     /** Sustituir por una implementación de Google Calendar en la siguiente fase. */
     override val calendario: CalendarioRepository = CalendarioRepositoryNoOp()

@@ -13,6 +13,7 @@ fun TareaEntity.aDominio(): Tarea = Tarea(
     categoria = categoria,
     duracionMinutos = duracionMinutos,
     horaRecordatorio = horaRecordatorio?.let { LocalTime.of(it / 60, it % 60) },
+    usarPomodoro = usarPomodoro,
     recurrenteId = recurrenteId,
     creadaEn = creadaEn,
 )
@@ -26,6 +27,7 @@ fun Tarea.aEntidad(): TareaEntity = TareaEntity(
     categoria = categoria,
     duracionMinutos = duracionMinutos,
     horaRecordatorio = horaRecordatorio?.let { it.hour * 60 + it.minute },
+    usarPomodoro = usarPomodoro,
     recurrenteId = recurrenteId,
     creadaEn = creadaEn,
 )
@@ -35,6 +37,7 @@ fun TareaRecurrenteEntity.aDominio(): TareaRecurrente = TareaRecurrente(
     titulo = titulo,
     descripcion = descripcion,
     duracionMinutos = duracionMinutos,
+    usarPomodoro = usarPomodoro,
     horaRecordatorio = horaRecordatorio?.let { LocalTime.of(it / 60, it % 60) },
     creadaEn = creadaEn,
 )
@@ -45,5 +48,6 @@ fun TareaRecurrente.aEntidad(): TareaRecurrenteEntity = TareaRecurrenteEntity(
     descripcion = descripcion,
     duracionMinutos = duracionMinutos,
     horaRecordatorio = horaRecordatorio?.let { it.hour * 60 + it.minute },
+    usarPomodoro = usarPomodoro,
     creadaEn = creadaEn,
 )

@@ -1,5 +1,6 @@
 package com.enfoque.app.ui.panel
 
+import com.enfoque.app.domain.model.Racha
 import com.enfoque.app.domain.model.Tarea
 import com.enfoque.app.domain.model.TareaRecurrente
 import java.time.LocalDate
@@ -22,6 +23,7 @@ data class PanelUiState(
     val rutinas: List<RutinaUi> = emptyList(),
     /** Tareas pendientes que tienen un recordatorio configurado. */
     val recordatoriosActivos: Int = 0,
+    val racha: Racha = Racha(),
 ) {
     val totalHoy: Int
         get() = enfoqueDiario.size + completadasHoy.size

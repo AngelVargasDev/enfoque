@@ -14,5 +14,7 @@ data class TareaRecurrenteEntity(
     /** Minutos desde medianoche (0..1439). Null desactiva el recordatorio. */
     @ColumnInfo(defaultValue = "540")
     val horaRecordatorio: Int?,
+    @ColumnInfo(defaultValue = "0")
+    val usarPomodoro: Boolean = false,
     val creadaEn: Long,
 )

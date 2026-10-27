@@ -42,8 +42,21 @@
                 android:value="temporizador de tareas de enfoque" />
         </service>
 
+        <service
+            android:name=".data.temporizador.PomodoroService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="sesión pomodoro de enfoque" />
+        </service>
+
         <receiver
             android:name=".data.temporizador.AlarmaReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".data.temporizador.PomodoroAlarmaReceiver"
             android:exported="false" />
 
         <receiver

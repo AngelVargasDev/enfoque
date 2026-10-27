@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -58,6 +59,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.enfoque.app.data.alarma.Alarmas
 import com.enfoque.app.domain.model.CategoriaTarea
+import com.enfoque.app.domain.model.Racha
 import com.enfoque.app.domain.model.Tarea
 import com.enfoque.app.domain.model.TareaRecurrente
 import com.enfoque.app.ui.panel.componentes.TareaCard
@@ -67,7 +69,10 @@ import kotlinx.coroutines.flow.collect
 
 /** Pantalla única con los paneles de Enfoque Diario y Planeación. */
 @Composable
-fun PanelScreen(viewModel: PanelViewModel) {
+fun PanelScreen(
+    viewModel: PanelViewModel,
+    onAbrirConfiguracion: () -> Unit,
+) {
     val estado by viewModel.estado.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var mostrarDialogoTarea by rememberSaveable { mutableStateOf(false) }
@@ -131,10 +136,12 @@ fun PanelScreen(viewModel: PanelViewModel) {
                     fecha = estado.hoy,
                     completadas = estado.completadasHoy.size,
                     total = estado.totalHoy,
+                    racha = estado.racha,
+                    onAbrirConfiguracion = onAbrirConfiguracion,
                 )
             }
 
-            if (!alarmasExactas && estado.recordatoriosActivos > 0) {
+            if (!alarmasExactas) {
                 item(key = "aviso-alarmas") {
                     AvisoAlarmas(onActivar = { abrirAjustesAlarmas(contexto) })
                 }
@@ -145,6 +152,7 @@ fun PanelScreen(viewModel: PanelViewModel) {
                     estado = estado,
                     onCompletar = viewModel::alternarCompletada,
                     onIniciar = viewModel::iniciarTemporizador,
+                    onIniciarPomodoro = viewModel::iniciarPomodoro,
                     onMover = viewModel::moverTarea,
                     onEliminar = { tareaAEliminar = it },
                 )
@@ -166,6 +174,7 @@ fun PanelScreen(viewModel: PanelViewModel) {
                     mensajeVacio = "Nada programado para mañana.",
                     onCompletar = viewModel::alternarCompletada,
                     onIniciar = viewModel::iniciarTemporizador,
+                    onIniciarPomodoro = viewModel::iniciarPomodoro,
                     onMover = viewModel::moverTarea,
                     onEliminar = { tareaAEliminar = it },
                 )
@@ -178,6 +187,7 @@ fun PanelScreen(viewModel: PanelViewModel) {
                     mensajeVacio = "Sin ideas pendientes. Captura la siguiente con «Nueva tarea».",
                     onCompletar = viewModel::alternarCompletada,
                     onIniciar = viewModel::iniciarTemporizador,
+                    onIniciarPomodoro = viewModel::iniciarPomodoro,
                     onMover = viewModel::moverTarea,
                     onEliminar = { tareaAEliminar = it },
                 )
@@ -254,16 +264,44 @@ fun PanelScreen(viewModel: PanelViewModel) {
 }
 
 @Composable
-private fun CabeceraPrincipal(fecha: java.time.LocalDate, completadas: Int, total: Int) {
+private fun CabeceraPrincipal(
+    fecha: java.time.LocalDate,
+    completadas: Int,
+    total: Int,
+    racha: Racha,
+    onAbrirConfiguracion: () -> Unit,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text("Enfoque", style = MaterialTheme.typography.headlineMedium)
-            Text(
-                fechaLarga(fecha),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text("Enfoque", style = MaterialTheme.typography.headlineMedium)
+                Text(
+                    fechaLarga(fecha),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(onClick = onAbrirConfiguracion) {
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = "Configuración",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
+
+        Text(
+            text = textoRacha(racha),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (racha.actual > 0 && !racha.hoyCompletado) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.secondary
+            },
+        )
 
         if (total > 0) {
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -296,11 +334,27 @@ private fun CabeceraPrincipal(fecha: java.time.LocalDate, completadas: Int, tota
     }
 }
 
+private fun textoRacha(racha: Racha): String {
+    val diasActual = if (racha.actual == 1) "día" else "días"
+    val diasMejor = if (racha.mejor == 1) "día" else "días"
+    return when {
+        racha.actual > 0 && racha.hoyCompletado ->
+            "Racha de ${racha.actual} $diasActual · mejor ${racha.mejor} $diasMejor"
+        racha.actual > 0 ->
+            "Racha de ${racha.actual} $diasActual · hoy pendiente"
+        racha.mejor > 0 ->
+            "Mejor racha: ${racha.mejor} $diasMejor · empieza otra"
+        else ->
+            "Completa una tarea para empezar tu racha"
+    }
+}
+
 @Composable
 private fun SeccionHoy(
     estado: PanelUiState,
     onCompletar: (Tarea) -> Unit,
     onIniciar: (Tarea) -> Unit,
+    onIniciarPomodoro: (Tarea) -> Unit,
     onMover: (Tarea, CategoriaTarea) -> Unit,
     onEliminar: (Tarea) -> Unit,
 ) {
@@ -333,6 +387,7 @@ private fun SeccionHoy(
                     tarea = tarea,
                     onCompletarCambio = { onCompletar(tarea) },
                     onIniciar = { onIniciar(tarea) },
+                    onIniciarPomodoro = { onIniciarPomodoro(tarea) },
                     onMover = { categoria -> onMover(tarea, categoria) },
                     onEliminar = { onEliminar(tarea) },
                 )
@@ -362,6 +417,7 @@ private fun SeccionHoy(
                     tarea = tarea,
                     onCompletarCambio = { onCompletar(tarea) },
                     onIniciar = { onIniciar(tarea) },
+                    onIniciarPomodoro = { onIniciarPomodoro(tarea) },
                     onMover = { categoria -> onMover(tarea, categoria) },
                     onEliminar = { onEliminar(tarea) },
                 )
@@ -447,7 +503,11 @@ private fun RutinaRow(
                 ) {
                     Text(rutina.titulo, style = MaterialTheme.typography.titleMedium)
                     val detalles = buildList {
-                        rutina.duracionMinutos?.let { add("$it min") }
+                        if (rutina.usarPomodoro) {
+                            add("Pomodoro")
+                        } else {
+                            rutina.duracionMinutos?.let { add("$it min") }
+                        }
                         rutina.horaRecordatorio?.let { add(horaCorta(it)) }
                         if (rutina.descripcion.isNotBlank()) add(rutina.descripcion)
                     }
@@ -529,6 +589,7 @@ private fun SeccionLista(
     mensajeVacio: String,
     onCompletar: (Tarea) -> Unit,
     onIniciar: (Tarea) -> Unit,
+    onIniciarPomodoro: (Tarea) -> Unit,
     onMover: (Tarea, CategoriaTarea) -> Unit,
     onEliminar: (Tarea) -> Unit,
 ) {
@@ -548,6 +609,7 @@ private fun SeccionLista(
                     tarea = tarea,
                     onCompletarCambio = { onCompletar(tarea) },
                     onIniciar = { onIniciar(tarea) },
+                    onIniciarPomodoro = { onIniciarPomodoro(tarea) },
                     onMover = { categoria -> onMover(tarea, categoria) },
                     onEliminar = { onEliminar(tarea) },
                 )

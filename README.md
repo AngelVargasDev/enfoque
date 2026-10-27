@@ -2,9 +2,10 @@
 
 Aplicación Android para planear y ejecutar tareas con dos paneles complementarios:
 **Enfoque Diario** (lo que debe terminar antes de que acabe el día) y
-**Planeación** (Mañana + Backlog). Incluye **Rutinas** reutilizables, persistencia
-local con Room, recordatorios con `AlarmManager` y bloques de enfoque con
-temporizador en un servicio en primer plano.
+**Planeación** (Mañana + Backlog). Incluye **Rutinas** reutilizables, **Pomodoro**
+con alarmas por fase, **racha** de días completados, varios estilos de diseño,
+persistencia local con Room, recordatorios con `AlarmManager` y bloques de
+enfoque con temporizador en un servicio en primer plano.
 
 Esta es la **fase 1**: base funcional, sin conexión a Google Calendar, pero con
 los puntos de extensión preparados para integrarla sin reescribir la UI.
@@ -15,8 +16,9 @@ los puntos de extensión preparados para integrarla sin reescribir la UI.
 - MVVM: `PanelViewModel` + `StateFlow` + estado inmutable
 - Room (KSP) con modelo de dominio separado de la entidad
 - Repositorios como única puerta de entrada a los datos
-- `AlarmManager` para recordatorios y alarma de respaldo del temporizador
-- Servicio en primer plano (`specialUse`) + notificaciones con canal de alarma
+- `AlarmManager` para recordatorios y alarmas exactas de cada fase
+- Servicios en primer plano (`specialUse`) + notificaciones con acciones
+- Preferencias persistentes de diseño y Pomodoro (`SharedPreferences` + `StateFlow`)
 - Inyección de dependencias manual con `ContenedorApp` (fácil de migrar a Hilt)
 
 ## Requisitos
@@ -42,22 +44,25 @@ app/src/main/java/com/enfoque/app/
 ├── EnfoqueApplication.kt          # arranque + canales de notificación
 ├── di/ContenedorApp.kt            # composición de dependencias
 ├── domain/
-│   ├── model/                     # Tarea, TareaRecurrente, CategoriaTarea, EstadoTarea
+│   ├── model/                     # Tarea, TareaRecurrente, Ajustes, Racha
 │   ├── repository/TareaRepository.kt
+│   ├── repository/RachaRepository.kt
 │   ├── calendario/                # contrato futuro de Google Calendar
 │   └── temporizador/Temporizador.kt
 ├── data/
-│   ├── local/                     # Room: entidad, DAO, convertidores, mapeadores
-│   ├── repository/                # TareaRepositoryImpl (Room + recordatorios)
+│   ├── local/                     # Room: entidades, DAOs, convertidores, mapeadores
+│   ├── preferencias/              # diseño, tema y tiempos Pomodoro
+│   ├── repository/                # TareaRepositoryImpl, RachaRepositoryImpl
 │   ├── recordatorio/              # programador, receivers y reprogramación al reiniciar
-│   ├── temporizador/              # servicio, alarma de respaldo, notificaciones
+│   ├── temporizador/              # temporizador simple, Pomodoro, alarmas y notificaciones
 │   ├── alarma/Alarmas.kt          # alarmas exactas con degradación segura
 │   └── calendario/                # implementación no-op del contrato
 └── ui/
-    ├── MainActivity.kt            # edge-to-edge + permiso de notificaciones
+    ├── MainActivity.kt            # edge-to-edge, tema y ruta de configuración
+    ├── configuracion/             # tema, paletas y tiempos Pomodoro
     ├── panel/                     # pantalla, ViewModel, estado, formularios
     ├── panel/componentes/         # tarjeta de tarea reutilizable
-    ├── theme/                     # tema minimalista Material 3 claro/oscuro
+    ├── theme/                     # paletas Material 3 y tema dinámico
     └── util/Fechas.kt
 ```
 
@@ -75,15 +80,21 @@ Entidad `TareaEntity` (tabla `tareas`):
 | `categoria` | `HOY / MANANA / BACKLOG` | define el panel |
 | `duracionMinutos` | `Int?` | opcional; habilita el botón «Iniciar» |
 | `horaRecordatorio` | `Int?` | minutos desde medianoche; `null` desactiva el aviso |
+| `usarPomodoro` | `Boolean` | usa la sesión Pomodoro en lugar del temporizador simple |
 | `recurrenteId` | `Long?` | rutina que generó la tarea, si aplica |
 | `creadaEn` | `Long` | epoch millis, para ordenar |
 
 Entidad `TareaRecurrenteEntity` (tabla `tareas_recurrentes`): plantilla con
-`titulo`, `descripcion`, `duracionMinutos`, `horaRecordatorio` y `creadaEn`.
+`titulo`, `descripcion`, `duracionMinutos`, `horaRecordatorio`, `usarPomodoro`
+y `creadaEn`.
 
-El dominio usa `Tarea` y `TareaRecurrente`; las entidades nunca llegan a la UI.
-El DAO observa las tablas con `Flow` y el repositorio mapea entidad → dominio.
-La base está en la **versión 2** con una migración explícita (`MIGRACION_1_2`).
+Entidad `DiaCompletadoEntity` (tabla `dias_completados`): una fila por día con
+al menos una tarea completada. La fecha es la clave primaria.
+
+El dominio usa `Tarea`, `TareaRecurrente`, `AjustesApp` y `Racha`; las entidades
+nunca llegan a la UI. El DAO observa las tablas con `Flow` y el repositorio mapea
+entidad → dominio. La base está en la **versión 3** con migraciones explícitas
+(`MIGRACION_1_2` y `MIGRACION_2_3`).
 
 ## Paneles
 
@@ -97,6 +108,7 @@ La base está en la **versión 2** con una migración explícita (`MIGRACION_1_2
 - **Mañana**: tareas preparadas para el día siguiente, con acción rápida «Hoy».
 - **Backlog**: tareas generales, con acción rápida «Mañana».
 - El menú de cada tarjeta permite mover a cualquier panel o eliminar.
+- La cabecera muestra la **racha** y el acceso a **Configuración**.
 
 Al mover una tarea a `HOY` o `MANANA`, el repositorio reancla su fecha de
 vencimiento a hoy o mañana respectivamente. Mover al `BACKLOG` conserva la fecha.
@@ -116,13 +128,14 @@ abierta.
   cambiar la hora/zona horaria.
 - Se usa `setExactAndAllowWhileIdle` cuando el permiso de alarmas exactas está
   concedido; si no, se degrada a `setAndAllowWhileIdle` (puede sonar con minutos
-  de retraso). La app muestra un aviso con el botón **Activar** cuando hay
-  recordatorios pendientes y el permiso está desactivado.
+  de retraso). La app muestra un aviso con el botón **Activar** cuando el permiso
+  está desactivado, porque los recordatorios y Pomodoro dependen de alarmas
+  exactas.
 - En Android 13+ el usuario debe conceder notificaciones; la app las solicita al
   abrir. Para alarmas exactas: *Ajustes → Apps → Acceso especial → Alarmas y
   recordatorios*.
 
-## Temporizador de enfoque
+## Temporizador simple
 
 1. El formulario acepta una duración opcional (1–720 min). La tarjeta muestra
    el botón «Iniciar» solo si la tarea tiene duración.
@@ -137,12 +150,50 @@ abierta.
 4. Si el sistema destruye el servicio, la alarma despierta a `AlarmaReceiver`,
    que publica el mismo aviso. `SesionesTemporizador` garantiza que el aviso se
    emita una sola vez.
-5. Solo hay un temporizador activo: iniciar otro reemplaza al anterior y cancela
-   su alarma.
+5. Solo hay una sesión activa: iniciar otro temporizador o un Pomodoro detiene
+   la sesión anterior y cancela su alarma.
 
 La notificación de fin abre la app al tocarla. La tarea pasa a `EN_PROGRESO`
 mientras corre el bloque y vuelve a `PENDIENTE` al terminar; si la completaste
 durante el bloque, se respeta el estado `COMPLETADA`.
+
+## Pomodoro
+
+- Se activa por tarea al crearla (interruptor **Modo Pomodoro**) o al iniciarla
+  desde el menú de la tarjeta.
+- Tiempos por defecto: **25 min de enfoque, 5 min de descanso corto y 15 min de
+  descanso largo cada 4 bloques**. Se pueden cambiar en Configuración con los
+  presets Clásico, Profundo y Suave, o con los controles de cada valor.
+- `PomodoroService` mantiene la sesión en primer plano, encadena enfoque y
+  descanso, y programa una **alarma exacta al final de cada fase** con
+  `PomodoroAlarmas`.
+- La notificación permite **Pausar/Reanudar**, **Saltar** o **Detener**. Al
+  terminar una fase suena el canal `Pomodoro`.
+- Los descansos pueden iniciarse solos; el siguiente enfoque se puede iniciar
+  solo o esperar a que pulses **Continuar**. Ambas opciones se configuran.
+- Completar la tarea detiene su sesión Pomodoro automáticamente.
+- Si el proceso muere, `PomodoroAlarmaReceiver` avisa del final de la fase y
+  limpia la sesión.
+
+## Racha
+
+- La racha cuenta **días consecutivos con al menos una tarea completada**.
+- Cada día ganado se guarda en `dias_completados`; si completas otra tarea el
+  mismo día, el registro se ignora.
+- La cabecera muestra la racha actual, la mejor racha y si hoy está pendiente.
+- Desmarcar una tarea no borra el día ganado; se mantiene el logro.
+
+## Diseño y configuración
+
+La pantalla **Configuración** (engranaje de la cabecera) permite:
+
+- Elegir tema **Sistema**, **Claro** u **Oscuro**.
+- Elegir entre cinco paletas: **Minimalista**, **Bosque**, **Océano**,
+  **Atardecer** y **Monocromo**.
+- Ajustar los tiempos de Pomodoro y el comportamiento de los descansos.
+
+Todo se guarda en `SharedPreferences` y se aplica al instante mediante
+`StateFlow`; el tema y las barras del sistema se actualizan sin reiniciar.
 
 ## Punto de extensión: Google Calendar
 
@@ -185,9 +236,9 @@ porque documentan las migraciones.
 
 ```bash
 git log --oneline
-git tag v0.2.0
+git tag v0.3.0
 ```
 
 Para publicar una nueva versión: sube `versionCode` y `versionName` en
-`app/build.gradle.kts`, compila, haz commit y crea una etiqueta (`v0.2.0`). El APK
+`app/build.gradle.kts`, compila, haz commit y crea una etiqueta (`v0.3.0`). El APK
 de depuración queda en `app/build/outputs/apk/debug/app-debug.apk`.

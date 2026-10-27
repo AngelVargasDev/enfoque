@@ -118,6 +118,7 @@ class TareaRepositoryImpl(
             categoria = categoria,
             duracionMinutos = rutina.duracionMinutos,
             horaRecordatorio = rutina.horaRecordatorio,
+            usarPomodoro = rutina.usarPomodoro,
             recurrenteId = rutina.id,
         )
         val id = dao.insertar(tarea.aEntidad())

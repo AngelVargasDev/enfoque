@@ -58,12 +58,13 @@ fun NuevaTareaDialog(
     var duracionTexto by rememberSaveable { mutableStateOf("") }
     var recordatorioActivo by rememberSaveable { mutableStateOf(true) }
     var horaMinutos by rememberSaveable { mutableIntStateOf(9 * 60) }
+    var pomodoro by rememberSaveable { mutableStateOf(false) }
 
     val contexto = LocalContext.current
     val fecha = LocalDate.ofEpochDay(fechaEpoch)
     val duracion = duracionTexto.trim().toIntOrNull()
     val duracionValida = duracionTexto.isBlank() || (duracion != null && duracion in 1..720)
-    val puedeGuardar = titulo.isNotBlank() && duracionValida
+    val puedeGuardar = titulo.isNotBlank() && (pomodoro || duracionValida)
 
     val abrirSelectorFecha = {
         DatePickerDialog(
@@ -157,35 +158,56 @@ fun NuevaTareaDialog(
                     }
                 }
 
-                OutlinedTextField(
-                    value = duracionTexto,
-                    onValueChange = { nuevo -> duracionTexto = nuevo.filter(Char::isDigit).take(3) },
-                    label = { Text("Duración en minutos (opcional)") },
-                    isError = !duracionValida,
-                    supportingText = {
-                        Text(
-                            if (duracionValida) {
-                                "Con duración, la tarea muestra el botón Iniciar."
-                            } else {
-                                "Usa un valor entre 1 y 720 minutos."
-                            },
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(15, 25, 45).forEach { minutos ->
-                        val valor = minutos.toString()
-                        FilterChip(
-                            selected = duracionTexto == valor,
-                            onClick = {
-                                duracionTexto = if (duracionTexto == valor) "" else valor
-                            },
-                            label = { Text("$minutos min") },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Modo Pomodoro", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Enfoque y descansos con los tiempos de Configuración.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                    Switch(
+                        checked = pomodoro,
+                        onCheckedChange = { pomodoro = it },
+                    )
+                }
+
+                if (!pomodoro) {
+                    OutlinedTextField(
+                        value = duracionTexto,
+                        onValueChange = { nuevo -> duracionTexto = nuevo.filter(Char::isDigit).take(3) },
+                        label = { Text("Duración en minutos (opcional)") },
+                        isError = !duracionValida,
+                        supportingText = {
+                            Text(
+                                if (duracionValida) {
+                                    "Con duración, la tarea muestra el botón Iniciar."
+                                } else {
+                                    "Usa un valor entre 1 y 720 minutos."
+                                },
+                            )
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(15, 25, 45).forEach { minutos ->
+                            val valor = minutos.toString()
+                            FilterChip(
+                                selected = duracionTexto == valor,
+                                onClick = {
+                                    duracionTexto = if (duracionTexto == valor) "" else valor
+                                },
+                                label = { Text("$minutos min") },
+                            )
+                        }
                     }
                 }
             }
@@ -199,12 +221,13 @@ fun NuevaTareaDialog(
                             descripcion = descripcion.trim(),
                             fechaVencimiento = fecha,
                             categoria = categoria,
-                            duracionMinutos = duracion,
+                            duracionMinutos = if (pomodoro) null else duracion,
                             horaRecordatorio = if (recordatorioActivo) {
                                 LocalTime.of(horaMinutos / 60, horaMinutos % 60)
                             } else {
                                 null
                             },
+                            usarPomodoro = pomodoro,
                         ),
                     )
                 },
