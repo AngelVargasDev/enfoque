@@ -2,8 +2,9 @@
 
 Aplicación Android para planear y ejecutar tareas con dos paneles complementarios:
 **Enfoque Diario** (lo que debe terminar antes de que acabe el día) y
-**Planeación** (Mañana + Backlog). Incluye **Rutinas** reutilizables, **Pomodoro**
-con alarmas por fase, **racha** de días completados, varios estilos de diseño,
+**Planeación** (Mañana + Backlog + Programadas). Incluye **Rutinas**
+reutilizables, **Pomodoro** con alarmas por fase, **racha** de días completados,
+**control diario de peso** con gráfica y meta, varios estilos de diseño,
 persistencia local con Room, recordatorios con `AlarmManager` y bloques de
 enfoque con temporizador en un servicio en primer plano.
 
@@ -19,6 +20,7 @@ los puntos de extensión preparados para integrarla sin reescribir la UI.
 - `AlarmManager` para recordatorios y alarmas exactas de cada fase
 - Servicios en primer plano (`specialUse`) + notificaciones con acciones
 - Preferencias persistentes de diseño y Pomodoro (`SharedPreferences` + `StateFlow`)
+- Gráfica de peso dibujada con `Canvas`, sin dependencias externas
 - Inyección de dependencias manual con `ContenedorApp` (fácil de migrar a Hilt)
 
 ## Requisitos
@@ -44,26 +46,29 @@ app/src/main/java/com/enfoque/app/
 ├── EnfoqueApplication.kt          # arranque + canales de notificación
 ├── di/ContenedorApp.kt            # composición de dependencias
 ├── domain/
-│   ├── model/                     # Tarea, TareaRecurrente, Ajustes, Racha
+│   ├── model/                     # Tarea, TareaRecurrente, Peso, Ajustes, Racha
 │   ├── repository/TareaRepository.kt
 │   ├── repository/RachaRepository.kt
+│   ├── repository/PesoRepository.kt
 │   ├── calendario/                # contrato futuro de Google Calendar
 │   └── temporizador/Temporizador.kt
 ├── data/
 │   ├── local/                     # Room: entidades, DAOs, convertidores, mapeadores
-│   ├── preferencias/              # diseño, tema y tiempos Pomodoro
-│   ├── repository/                # TareaRepositoryImpl, RachaRepositoryImpl
+│   ├── preferencias/              # diseño, tema, tiempos Pomodoro y meta de peso
+│   ├── repository/                # Tarea, Racha y Peso (Room + recordatorios)
 │   ├── recordatorio/              # programador, receivers y reprogramación al reiniciar
 │   ├── temporizador/              # temporizador simple, Pomodoro, alarmas y notificaciones
 │   ├── alarma/Alarmas.kt          # alarmas exactas con degradación segura
 │   └── calendario/                # implementación no-op del contrato
 └── ui/
-    ├── MainActivity.kt            # edge-to-edge, tema y ruta de configuración
+    ├── MainActivity.kt            # edge-to-edge, tema y navegación principal
     ├── configuracion/             # tema, paletas y tiempos Pomodoro
+    ├── navegacion/                # barra Tareas / Peso
     ├── panel/                     # pantalla, ViewModel, estado, formularios
     ├── panel/componentes/         # tarjeta de tarea reutilizable
+    ├── peso/                      # pantalla, gráfica, historial y diálogos de peso
     ├── theme/                     # paletas Material 3 y tema dinámico
-    └── util/Fechas.kt
+    └── util/Fechas.kt y Peso.kt
 ```
 
 ## Modelo de datos
@@ -91,22 +96,32 @@ y `creadaEn`.
 Entidad `DiaCompletadoEntity` (tabla `dias_completados`): una fila por día con
 al menos una tarea completada. La fecha es la clave primaria.
 
-El dominio usa `Tarea`, `TareaRecurrente`, `AjustesApp` y `Racha`; las entidades
-nunca llegan a la UI. El DAO observa las tablas con `Flow` y el repositorio mapea
-entidad → dominio. La base está en la **versión 3** con migraciones explícitas
-(`MIGRACION_1_2` y `MIGRACION_2_3`).
+Entidad `PesoEntity` (tabla `pesos`): un registro por día con `fecha`, `pesoKg`
+(en kilogramos), `nota` y `creadoEn`. Volver a guardar la misma fecha actualiza
+el registro.
+
+El dominio usa `Tarea`, `TareaRecurrente`, `Peso`, `AjustesApp` y `Racha`; las
+entidades nunca llegan a la UI. El DAO observa las tablas con `Flow` y el
+repositorio mapea entidad → dominio. La base está en la **versión 4** con
+migraciones explícitas (`MIGRACION_1_2`, `MIGRACION_2_3` y `MIGRACION_3_4`).
 
 ## Paneles
+
+El orden de las secciones es **Hoy → Mañana → Backlog → Programadas**; las
+Rutinas quedan al final como herramienta de captura.
 
 - **Hoy**: tareas de categoría `HOY` que no están completadas, con contador de
   progreso (completadas / total de hoy). Las completadas se ocultan para mantener
   el foco, pero «Ver completadas» permite reabrirlas, moverlas o eliminarlas.
+- **Mañana**: tareas preparadas para el día siguiente, con acción rápida «Hoy».
+- **Backlog**: tareas generales, con acción rápida «Mañana».
+- **Programadas**: tareas con una fecha futura (más allá de mañana). Se crean
+  eligiendo una fecha en el formulario; no se muestran en Backlog. Cuando la
+  fecha llega a mañana pasan a **Mañana** y, al día siguiente, a **Hoy**.
 - **Rutinas**: plantillas que se repiten (por ejemplo, «Estudiar inglés»). Cada
   rutina tiene dos selectores, **Hoy** y **Mañana**; al activarlos se crea una
   tarea normal en el panel correspondiente. Al desactivarlos se retira esa
   ocurrencia. La rutina sigue disponible todos los días.
-- **Mañana**: tareas preparadas para el día siguiente, con acción rápida «Hoy».
-- **Backlog**: tareas generales, con acción rápida «Mañana».
 - El menú de cada tarjeta permite mover a cualquier panel o eliminar.
 - La cabecera muestra la **racha** y el acceso a **Configuración**.
 
@@ -114,14 +129,18 @@ Al mover una tarea a `HOY` o `MANANA`, el repositorio reancla su fecha de
 vencimiento a hoy o mañana respectivamente. Mover al `BACKLOG` conserva la fecha.
 
 **Cambio de día:** el ViewModel revisa la fecha cada medianoche y al volver a la
-app. Las tareas de `MANANA` cuya fecha ya llegó se promueven a `HOY` en la base
-de datos, de modo que dejan de mostrarse como «Mañana» aunque la app siguiera
-abierta.
+app. Además, `BootReceiver` escucha `ACTION_DATE_CHANGED` para hacer la
+promoción incluso si la app está cerrada. Las tareas de `MANANA` y `PROGRAMADA`
+cuya fecha ya llegó se promueven a `HOY` en la base de datos; una tarea
+`PROGRAMADA` que llega a mañana pasa a `MANANA`.
 
 ## Recordatorios locales
 
-- Cada tarea pendiente programa un aviso a la **hora elegida en el formulario**
-  (09:00 por defecto). El interruptor «Recordatorio» lo desactiva por tarea.
+- Cada tarea pendiente programa un aviso a la **hora elegida en el formulario**.
+  Las tareas nuevas nacen **sin recordatorio**; el interruptor «Recordatorio» se
+  activa solo si el usuario lo enciende.
+- Las tareas existentes conservan el aviso de las 09:00 que tenían antes de la
+  actualización.
 - Si la hora ya pasó, no se programa nada.
 - Completar o eliminar una tarea cancela su alarma.
 - `BootReceiver` reprograma todo después de reiniciar, actualizar la app o
@@ -183,6 +202,26 @@ durante el bloque, se respeta el estado `COMPLETADA`.
 - La cabecera muestra la racha actual, la mejor racha y si hoy está pendiente.
 - Desmarcar una tarea no borra el día ganado; se mantiene el logro.
 
+## Control de peso
+
+La pestaña **Peso** de la barra inferior es independiente de las tareas y los
+recordatorios. Permite:
+
+- Registrar **un peso por día** (fecha, kilogramos y una nota opcional). Si
+  repites la fecha, el registro se actualiza.
+- Editar o eliminar registros anteriores tocando una fila del historial.
+- Ver el **peso actual**, el cambio desde el registro anterior, el cambio total,
+  el cambio de los últimos 7 días y el promedio de los últimos 7 días.
+- Consultar la **gráfica de evolución** con filtros de 7, 30, 90 días o todo el
+  historial, además de mínimo, máximo y promedio.
+- Definir una **meta de peso** opcional; el progreso se calcula desde el primer
+  registro y se muestra cuántos kilos faltan.
+- Revisar días anteriores en el historial y en la gráfica, con la fecha de cada
+  registro.
+
+El peso se guarda con un decimal en la tabla `pesos`. La sección está pensada
+para pesarse a la misma hora, preferiblemente al despertar y antes de desayunar.
+
 ## Diseño y configuración
 
 La pantalla **Configuración** (engranaje de la cabecera) permite:
@@ -191,9 +230,11 @@ La pantalla **Configuración** (engranaje de la cabecera) permite:
 - Elegir entre cinco paletas: **Minimalista**, **Bosque**, **Océano**,
   **Atardecer** y **Monocromo**.
 - Ajustar los tiempos de Pomodoro y el comportamiento de los descansos.
+- Definir o cambiar la meta de peso desde la pantalla de Peso.
 
-Todo se guarda en `SharedPreferences` y se aplica al instante mediante
-`StateFlow`; el tema y las barras del sistema se actualizan sin reiniciar.
+La barra inferior alterna entre **Tareas** y **Peso**. Todo se guarda en
+`SharedPreferences` y se aplica al instante mediante `StateFlow`; el tema y las
+barras del sistema se actualizan sin reiniciar.
 
 ## Punto de extensión: Google Calendar
 
@@ -236,9 +277,9 @@ porque documentan las migraciones.
 
 ```bash
 git log --oneline
-git tag v0.3.0
+git tag v0.4.0
 ```
 
 Para publicar una nueva versión: sube `versionCode` y `versionName` en
-`app/build.gradle.kts`, compila, haz commit y crea una etiqueta (`v0.3.0`). El APK
+`app/build.gradle.kts`, compila, haz commit y crea una etiqueta (`v0.4.0`). El APK
 de depuración queda en `app/build/outputs/apk/debug/app-debug.apk`.

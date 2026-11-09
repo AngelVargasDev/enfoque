@@ -13,8 +13,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TareaEntity::class,
         TareaRecurrenteEntity::class,
         DiaCompletadoEntity::class,
+        PesoEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Convertidores::class)
@@ -25,6 +26,8 @@ abstract class EnfoqueDatabase : RoomDatabase() {
     abstract fun tareaRecurrenteDao(): TareaRecurrenteDao
 
     abstract fun rachaDao(): RachaDao
+
+    abstract fun pesoDao(): PesoDao
 
     companion object {
         private const val NOMBRE = "enfoque.db"
@@ -74,9 +77,26 @@ abstract class EnfoqueDatabase : RoomDatabase() {
             }
         }
 
+        /** Añade el historial diario de peso. */
+        val MIGRACION_3_4 = object : Migration(3, 4) {
+            override fun migrate(baseDeDatos: SupportSQLiteDatabase) {
+                baseDeDatos.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `pesos` (
+                        `fecha` INTEGER NOT NULL,
+                        `pesoKg` REAL NOT NULL,
+                        `nota` TEXT NOT NULL,
+                        `creadoEn` INTEGER NOT NULL,
+                        PRIMARY KEY(`fecha`)
+                    )
+                    """.trimIndent(),
+                )
+            }
+        }
+
         fun construir(context: Context): EnfoqueDatabase =
             Room.databaseBuilder(context, EnfoqueDatabase::class.java, NOMBRE)
-                .addMigrations(MIGRACION_1_2, MIGRACION_2_3)
+                .addMigrations(MIGRACION_1_2, MIGRACION_2_3, MIGRACION_3_4)
                 .build()
     }
 }

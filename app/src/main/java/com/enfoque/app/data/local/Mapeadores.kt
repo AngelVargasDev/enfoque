@@ -1,5 +1,6 @@
 package com.enfoque.app.data.local
 
+import com.enfoque.app.domain.model.Peso
 import com.enfoque.app.domain.model.Tarea
 import com.enfoque.app.domain.model.TareaRecurrente
 import java.time.LocalTime
@@ -50,4 +51,18 @@ fun TareaRecurrente.aEntidad(): TareaRecurrenteEntity = TareaRecurrenteEntity(
     horaRecordatorio = horaRecordatorio?.let { it.hour * 60 + it.minute },
     usarPomodoro = usarPomodoro,
     creadaEn = creadaEn,
+)
+
+fun PesoEntity.aDominio(): Peso = Peso(
+    fecha = fecha,
+    pesoKg = pesoKg,
+    nota = nota,
+    creadoEn = creadoEn,
+)
+
+fun Peso.aEntidad(): PesoEntity = PesoEntity(
+    fecha = fecha,
+    pesoKg = pesoKg,
+    nota = nota,
+    creadoEn = creadoEn,
 )

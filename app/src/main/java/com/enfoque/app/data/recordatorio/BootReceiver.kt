@@ -20,6 +20,7 @@ class BootReceiver : BroadcastReceiver() {
             Intent.ACTION_MY_PACKAGE_REPLACED,
             Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_TIMEZONE_CHANGED,
+            Intent.ACTION_DATE_CHANGED,
         )
         val accion = intent.action ?: return
         if (accion !in accionesValidas) return
@@ -29,6 +30,7 @@ class BootReceiver : BroadcastReceiver() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                contenedor.tareas.normalizarFechas()
                 contenedor.tareas.reprogramarRecordatorios()
             } finally {
                 resultado.finish()

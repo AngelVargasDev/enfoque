@@ -20,6 +20,7 @@ data class PanelUiState(
     val completadasHoy: List<Tarea> = emptyList(),
     val manana: List<Tarea> = emptyList(),
     val backlog: List<Tarea> = emptyList(),
+    val programadas: List<Tarea> = emptyList(),
     val rutinas: List<RutinaUi> = emptyList(),
     /** Tareas pendientes que tienen un recordatorio configurado. */
     val recordatoriosActivos: Int = 0,

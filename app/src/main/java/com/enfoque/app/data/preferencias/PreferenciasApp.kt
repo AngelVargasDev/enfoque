@@ -33,6 +33,8 @@ class PreferenciasApp(context: Context) {
     fun actualizarPomodoro(transform: (AjustesPomodoro) -> AjustesPomodoro) =
         actualizar { it.copy(pomodoro = transform(it.pomodoro).normalizado()) }
 
+    fun definirMetaPeso(metaKg: Double?) = actualizar { it.copy(metaPesoKg = metaKg) }
+
     private fun cargar(): AjustesApp = AjustesApp(
         modoDiseno = leerEnum(CLAVE_DISENO, ModoDiseno.MINIMALISTA),
         tema = leerEnum(CLAVE_TEMA, TemaApp.SISTEMA),
@@ -44,6 +46,9 @@ class PreferenciasApp(context: Context) {
             autoIniciarDescansos = prefs.getBoolean(CLAVE_AUTO_DESCANSOS, true),
             autoIniciarEnfoque = prefs.getBoolean(CLAVE_AUTO_ENFOQUE, false),
         ).normalizado(),
+        metaPesoKg = prefs.getFloat(CLAVE_META_PESO, -1f)
+            .takeIf { it > 0f }
+            ?.toDouble(),
     )
 
     private fun guardar(ajustes: AjustesApp) {
@@ -56,6 +61,13 @@ class PreferenciasApp(context: Context) {
             .putInt(CLAVE_CICLOS, ajustes.pomodoro.ciclosAntesDescansoLargo)
             .putBoolean(CLAVE_AUTO_DESCANSOS, ajustes.pomodoro.autoIniciarDescansos)
             .putBoolean(CLAVE_AUTO_ENFOQUE, ajustes.pomodoro.autoIniciarEnfoque)
+            .apply {
+                if (ajustes.metaPesoKg != null) {
+                    putFloat(CLAVE_META_PESO, ajustes.metaPesoKg.toFloat())
+                } else {
+                    remove(CLAVE_META_PESO)
+                }
+            }
             .apply()
     }
 
@@ -74,5 +86,6 @@ class PreferenciasApp(context: Context) {
         const val CLAVE_CICLOS = "pomodoro_ciclos"
         const val CLAVE_AUTO_DESCANSOS = "pomodoro_auto_descansos"
         const val CLAVE_AUTO_ENFOQUE = "pomodoro_auto_enfoque"
+        const val CLAVE_META_PESO = "meta_peso_kg"
     }
 }

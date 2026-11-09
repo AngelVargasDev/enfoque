@@ -18,7 +18,7 @@ data class Tarea(
     /** Duración opcional del bloque de enfoque. Si es null, la tarea no tiene temporizador. */
     val duracionMinutos: Int? = null,
     /** Hora del recordatorio local. `null` desactiva el aviso de esta tarea. */
-    val horaRecordatorio: LocalTime? = LocalTime.of(9, 0),
+    val horaRecordatorio: LocalTime? = null,
     /** Si la tarea usa el modo Pomodoro en lugar del temporizador simple. */
     val usarPomodoro: Boolean = false,
     /** Si la tarea nació de una rutina, guarda su identificador. */

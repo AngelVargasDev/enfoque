@@ -5,10 +5,12 @@ import com.enfoque.app.data.calendario.CalendarioRepositoryNoOp
 import com.enfoque.app.data.local.EnfoqueDatabase
 import com.enfoque.app.data.preferencias.PreferenciasApp
 import com.enfoque.app.data.recordatorio.RecordatorioProgramador
+import com.enfoque.app.data.repository.PesoRepositoryImpl
 import com.enfoque.app.data.repository.RachaRepositoryImpl
 import com.enfoque.app.data.repository.TareaRepositoryImpl
 import com.enfoque.app.data.temporizador.TemporizadorAndroid
 import com.enfoque.app.domain.calendario.CalendarioRepository
+import com.enfoque.app.domain.repository.PesoRepository
 import com.enfoque.app.domain.repository.RachaRepository
 import com.enfoque.app.domain.repository.TareaRepository
 import com.enfoque.app.domain.temporizador.Temporizador
@@ -17,6 +19,7 @@ import com.enfoque.app.domain.temporizador.Temporizador
 interface ContenedorApp {
     val tareas: TareaRepository
     val racha: RachaRepository
+    val pesos: PesoRepository
     val temporizador: Temporizador
     val calendario: CalendarioRepository
     val preferencias: PreferenciasApp
@@ -39,6 +42,10 @@ class ContenedorAppImpl(context: Context) : ContenedorApp {
 
     override val racha: RachaRepository by lazy {
         RachaRepositoryImpl(dao = baseDeDatos.rachaDao())
+    }
+
+    override val pesos: PesoRepository by lazy {
+        PesoRepositoryImpl(dao = baseDeDatos.pesoDao())
     }
 
     override val temporizador: Temporizador by lazy { TemporizadorAndroid(contexto) }

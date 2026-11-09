@@ -106,6 +106,7 @@ class PanelViewModel(
                 CategoriaTarea.HOY -> "Movida al enfoque de hoy"
                 CategoriaTarea.MANANA -> "Programada para mañana"
                 CategoriaTarea.BACKLOG -> "Enviada al backlog"
+                CategoriaTarea.PROGRAMADA -> "Programada para otra fecha"
             }
             _eventos.tryEmit(mensaje)
         }
@@ -193,13 +194,15 @@ class PanelViewModel(
         diasCompletados: List<LocalDate>,
         dia: LocalDate,
     ): PanelUiState {
-        val manana = dia.plusDays(1)
+        val diaManana = dia.plusDays(1)
 
-        // Una tarea de "Mañana" cuya fecha ya llegó cuenta como de hoy aunque la
-        // migración de la base todavía no se haya ejecutado.
+        // Una tarea de "Mañana" o "Programada" cuya fecha ya llegó cuenta como de
+        // hoy aunque la migración de la base todavía no se haya ejecutado.
         fun correspondeAHoy(tarea: Tarea): Boolean =
             tarea.categoria == CategoriaTarea.HOY ||
-                (tarea.categoria == CategoriaTarea.MANANA && !tarea.fechaVencimiento.isAfter(dia))
+                ((tarea.categoria == CategoriaTarea.MANANA ||
+                    tarea.categoria == CategoriaTarea.PROGRAMADA) &&
+                    !tarea.fechaVencimiento.isAfter(dia))
 
         val deHoy = lista.filter(::correspondeAHoy)
 
@@ -209,9 +212,16 @@ class PanelViewModel(
             enfoqueDiario = deHoy.filterNot { it.estaCompletada },
             completadasHoy = deHoy.filter { it.estaCompletada },
             manana = lista.filter {
-                it.categoria == CategoriaTarea.MANANA && it.fechaVencimiento.isAfter(dia)
+                (it.categoria == CategoriaTarea.MANANA ||
+                    it.categoria == CategoriaTarea.PROGRAMADA) &&
+                    it.fechaVencimiento == diaManana
             },
             backlog = lista.filter { it.categoria == CategoriaTarea.BACKLOG },
+            programadas = lista.filter {
+                (it.categoria == CategoriaTarea.MANANA ||
+                    it.categoria == CategoriaTarea.PROGRAMADA) &&
+                    it.fechaVencimiento.isAfter(diaManana)
+            },
             rutinas = rutinas.map { rutina ->
                 RutinaUi(
                     rutina = rutina,
@@ -219,7 +229,7 @@ class PanelViewModel(
                         it.recurrenteId == rutina.id && it.fechaVencimiento == dia
                     },
                     enManana = lista.any {
-                        it.recurrenteId == rutina.id && it.fechaVencimiento == manana
+                        it.recurrenteId == rutina.id && it.fechaVencimiento == diaManana
                     },
                 )
             },

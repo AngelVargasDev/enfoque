@@ -55,8 +55,16 @@ interface TareaDao {
      * Al cruzar la medianoche, las tareas preparadas para "mañana" pasan a "hoy".
      * También recupera las que quedaron vencidas de días anteriores.
      */
-    @Query("UPDATE tareas SET categoria = 'HOY' WHERE categoria = 'MANANA' AND fechaVencimiento <= :hoy")
-    suspend fun promoverMananaVencida(hoy: LocalDate)
+    @Query("UPDATE tareas SET categoria = 'HOY' WHERE categoria IN ('MANANA', 'PROGRAMADA') AND fechaVencimiento <= :hoy")
+    suspend fun promoverVencidas(hoy: LocalDate)
+
+    /** Una tarea programada que llega a mañana pasa al panel de Mañana. */
+    @Query("UPDATE tareas SET categoria = 'MANANA' WHERE categoria = 'PROGRAMADA' AND fechaVencimiento = :manana")
+    suspend fun promoverProgramadaAManana(manana: LocalDate)
+
+    /** Una tarea de Mañana con una fecha más lejana pasa a Programadas. */
+    @Query("UPDATE tareas SET categoria = 'PROGRAMADA' WHERE categoria = 'MANANA' AND fechaVencimiento > :manana")
+    suspend fun moverMananaFuturaAProgramada(manana: LocalDate)
 
     /** Al terminar el temporizador, solo revierte si la tarea sigue en progreso. */
     @Query("UPDATE tareas SET estado = 'PENDIENTE' WHERE id = :id AND estado = 'EN_PROGRESO'")

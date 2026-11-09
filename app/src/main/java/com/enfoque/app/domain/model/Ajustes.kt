@@ -39,4 +39,6 @@ data class AjustesApp(
     val modoDiseno: ModoDiseno = ModoDiseno.MINIMALISTA,
     val tema: TemaApp = TemaApp.SISTEMA,
     val pomodoro: AjustesPomodoro = AjustesPomodoro(),
+    /** Meta de peso en kilogramos; `null` si aún no se ha definido. */
+    val metaPesoKg: Double? = null,
 )

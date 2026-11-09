@@ -234,7 +234,7 @@ fun ConfiguracionScreen(
 
                 item(key = "pie") {
                     Text(
-                        "Enfoque 0.3.0 · Los cambios se guardan al instante.",
+                        "Enfoque 0.4.0 · Los cambios se guardan al instante.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

@@ -43,7 +43,7 @@ fun NuevaRutinaDialog(
     var titulo by rememberSaveable { mutableStateOf("") }
     var descripcion by rememberSaveable { mutableStateOf("") }
     var duracionTexto by rememberSaveable { mutableStateOf("") }
-    var recordatorioActivo by rememberSaveable { mutableStateOf(true) }
+    var recordatorioActivo by rememberSaveable { mutableStateOf(false) }
     var horaMinutos by rememberSaveable { mutableIntStateOf(9 * 60) }
     var pomodoro by rememberSaveable { mutableStateOf(false) }
 

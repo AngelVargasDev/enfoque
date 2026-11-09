@@ -25,3 +25,10 @@ fun etiquetaFecha(fecha: LocalDate, hoy: LocalDate = LocalDate.now()): String = 
     hoy.minusDays(1) -> "Ayer"
     else -> fecha.format(formatoCorto)
 }
+
+/** Etiqueta para el historial: Hoy, Ayer o la fecha larga. */
+fun fechaHistorial(fecha: LocalDate, hoy: LocalDate = LocalDate.now()): String = when (fecha) {
+    hoy -> "Hoy"
+    hoy.minusDays(1) -> "Ayer"
+    else -> fechaLarga(fecha)
+}

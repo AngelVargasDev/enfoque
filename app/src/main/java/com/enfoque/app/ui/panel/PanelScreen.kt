@@ -63,6 +63,8 @@ import com.enfoque.app.domain.model.Racha
 import com.enfoque.app.domain.model.Tarea
 import com.enfoque.app.domain.model.TareaRecurrente
 import com.enfoque.app.ui.panel.componentes.TareaCard
+import com.enfoque.app.ui.navegacion.BarraNavegacion
+import com.enfoque.app.ui.navegacion.SeccionPrincipal
 import com.enfoque.app.ui.util.fechaLarga
 import com.enfoque.app.ui.util.horaCorta
 import kotlinx.coroutines.flow.collect
@@ -72,6 +74,7 @@ import kotlinx.coroutines.flow.collect
 fun PanelScreen(
     viewModel: PanelViewModel,
     onAbrirConfiguracion: () -> Unit,
+    onNavegar: (SeccionPrincipal) -> Unit,
 ) {
     val estado by viewModel.estado.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -108,6 +111,12 @@ fun PanelScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
+        bottomBar = {
+            BarraNavegacion(
+                actual = SeccionPrincipal.TAREAS,
+                onSeleccionar = onNavegar,
+            )
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { mostrarDialogoTarea = true },
@@ -158,15 +167,6 @@ fun PanelScreen(
                 )
             }
 
-            item(key = "seccion-rutinas") {
-                SeccionRutinas(
-                    rutinas = estado.rutinas,
-                    onAgregar = { mostrarDialogoRutina = true },
-                    onAlternar = viewModel::alternarRutina,
-                    onEliminar = { rutinaAEliminar = it },
-                )
-            }
-
             item(key = "seccion-manana") {
                 SeccionLista(
                     titulo = "Mañana",
@@ -190,6 +190,28 @@ fun PanelScreen(
                     onIniciarPomodoro = viewModel::iniciarPomodoro,
                     onMover = viewModel::moverTarea,
                     onEliminar = { tareaAEliminar = it },
+                )
+            }
+
+            item(key = "seccion-programadas") {
+                SeccionLista(
+                    titulo = "Programadas",
+                    tareas = estado.programadas,
+                    mensajeVacio = "Sin tareas para más adelante. Elige una fecha futura al crearlas.",
+                    onCompletar = viewModel::alternarCompletada,
+                    onIniciar = viewModel::iniciarTemporizador,
+                    onIniciarPomodoro = viewModel::iniciarPomodoro,
+                    onMover = viewModel::moverTarea,
+                    onEliminar = { tareaAEliminar = it },
+                )
+            }
+
+            item(key = "seccion-rutinas") {
+                SeccionRutinas(
+                    rutinas = estado.rutinas,
+                    onAgregar = { mostrarDialogoRutina = true },
+                    onAlternar = viewModel::alternarRutina,
+                    onEliminar = { rutinaAEliminar = it },
                 )
             }
         }

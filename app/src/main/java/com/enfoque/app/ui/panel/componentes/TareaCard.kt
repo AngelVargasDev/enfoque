@@ -66,6 +66,7 @@ fun TareaCard(
     val accionRapida = when (tarea.categoria) {
         CategoriaTarea.BACKLOG -> CategoriaTarea.MANANA
         CategoriaTarea.MANANA -> CategoriaTarea.HOY
+        CategoriaTarea.PROGRAMADA -> CategoriaTarea.HOY
         CategoriaTarea.HOY -> null
     }
 

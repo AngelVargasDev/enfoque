@@ -50,6 +50,7 @@ class TareaRepositoryImpl(
             CategoriaTarea.HOY -> hoy
             CategoriaTarea.MANANA -> hoy.plusDays(1)
             CategoriaTarea.BACKLOG -> actual.fechaVencimiento
+            CategoriaTarea.PROGRAMADA -> maxOf(actual.fechaVencimiento, hoy.plusDays(2))
         }
         dao.actualizarCategoria(id, categoria, nuevaFecha)
         recordatorios.programar(actual.copy(categoria = categoria, fechaVencimiento = nuevaFecha))
@@ -102,6 +103,7 @@ class TareaRepositoryImpl(
             CategoriaTarea.HOY -> hoy
             CategoriaTarea.MANANA -> hoy.plusDays(1)
             CategoriaTarea.BACKLOG -> return false
+            CategoriaTarea.PROGRAMADA -> return false
         }
 
         val existente = dao.obtenerPorRecurrenteYFecha(rutina.id, fecha)
@@ -127,6 +129,10 @@ class TareaRepositoryImpl(
     }
 
     override suspend fun normalizarFechas() {
-        dao.promoverMananaVencida(LocalDate.now(reloj))
+        val hoy = LocalDate.now(reloj)
+        val manana = hoy.plusDays(1)
+        dao.promoverVencidas(hoy)
+        dao.promoverProgramadaAManana(manana)
+        dao.moverMananaFuturaAProgramada(manana)
     }
 }

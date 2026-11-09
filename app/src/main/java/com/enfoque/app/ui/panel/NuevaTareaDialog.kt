@@ -56,7 +56,7 @@ fun NuevaTareaDialog(
     var categoria by rememberSaveable { mutableStateOf(CategoriaTarea.HOY) }
     var fechaEpoch by rememberSaveable { mutableLongStateOf(LocalDate.now().toEpochDay()) }
     var duracionTexto by rememberSaveable { mutableStateOf("") }
-    var recordatorioActivo by rememberSaveable { mutableStateOf(true) }
+    var recordatorioActivo by rememberSaveable { mutableStateOf(false) }
     var horaMinutos by rememberSaveable { mutableIntStateOf(9 * 60) }
     var pomodoro by rememberSaveable { mutableStateOf(false) }
 
@@ -117,18 +117,20 @@ fun NuevaTareaDialog(
 
                 Text("Cuándo", style = MaterialTheme.typography.labelLarge)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CategoriaTarea.entries.forEach { opcion ->
-                        FilterChip(
-                            selected = categoria == opcion,
-                            onClick = {
-                                categoria = opcion
-                                if (opcion != CategoriaTarea.BACKLOG) {
-                                    fechaEpoch = cuandoOcurre(opcion).toEpochDay()
-                                }
-                            },
-                            label = { Text(opcion.etiqueta()) },
-                        )
-                    }
+                    CategoriaTarea.entries
+                        .filter { it != CategoriaTarea.PROGRAMADA }
+                        .forEach { opcion ->
+                            FilterChip(
+                                selected = categoria == opcion,
+                                onClick = {
+                                    categoria = opcion
+                                    if (opcion != CategoriaTarea.BACKLOG) {
+                                        fechaEpoch = cuandoOcurre(opcion).toEpochDay()
+                                    }
+                                },
+                                label = { Text(opcion.etiqueta()) },
+                            )
+                        }
                 }
 
                 OutlinedButton(onClick = abrirSelectorFecha, modifier = Modifier.fillMaxWidth()) {
@@ -139,6 +141,13 @@ fun NuevaTareaDialog(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(fechaLarga(fecha))
+                }
+                if (categoria == CategoriaTarea.PROGRAMADA) {
+                    Text(
+                        "Se guardará en Programadas.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
                 }
 
                 Row(
@@ -246,6 +255,7 @@ private fun cuandoOcurre(categoria: CategoriaTarea): LocalDate = when (categoria
     CategoriaTarea.HOY -> LocalDate.now()
     CategoriaTarea.MANANA -> LocalDate.now().plusDays(1)
     CategoriaTarea.BACKLOG -> LocalDate.now()
+    CategoriaTarea.PROGRAMADA -> LocalDate.now().plusDays(2)
 }
 
 /** Mantiene la categoría coherente con la fecha elegida a mano. */
@@ -254,6 +264,7 @@ private fun categoriaParaFecha(fecha: LocalDate): CategoriaTarea {
     return when {
         fecha == hoy -> CategoriaTarea.HOY
         fecha == hoy.plusDays(1) -> CategoriaTarea.MANANA
+        fecha.isAfter(hoy.plusDays(1)) -> CategoriaTarea.PROGRAMADA
         else -> CategoriaTarea.BACKLOG
     }
 }
@@ -262,4 +273,5 @@ private fun CategoriaTarea.etiqueta(): String = when (this) {
     CategoriaTarea.HOY -> "Hoy"
     CategoriaTarea.MANANA -> "Mañana"
     CategoriaTarea.BACKLOG -> "Backlog"
+    CategoriaTarea.PROGRAMADA -> "Programada"
 }

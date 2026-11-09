@@ -26,8 +26,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.enfoque.app.EnfoqueApplication
 import com.enfoque.app.domain.model.TemaApp
 import com.enfoque.app.ui.configuracion.ConfiguracionScreen
+import com.enfoque.app.ui.navegacion.SeccionPrincipal
 import com.enfoque.app.ui.panel.PanelScreen
 import com.enfoque.app.ui.panel.PanelViewModel
+import com.enfoque.app.ui.peso.PesoViewModel
+import com.enfoque.app.ui.peso.PesoScreen
 import com.enfoque.app.ui.theme.EnfoqueTheme
 
 class MainActivity : ComponentActivity() {
@@ -41,6 +44,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val ajustes by contenedor.preferencias.ajustes.collectAsStateWithLifecycle()
             var mostrarConfiguracion by rememberSaveable { mutableStateOf(false) }
+            var seccion by rememberSaveable { mutableStateOf(SeccionPrincipal.TAREAS) }
             val oscuro = when (ajustes.tema) {
                 TemaApp.SISTEMA -> isSystemInDarkTheme()
                 TemaApp.CLARO -> false
@@ -59,9 +63,6 @@ class MainActivity : ComponentActivity() {
                 tema = ajustes.tema,
             ) {
                 PedirPermisoNotificaciones()
-                val viewModel: PanelViewModel = viewModel(
-                    factory = PanelViewModel.fabrica(contenedor),
-                )
 
                 if (mostrarConfiguracion) {
                     BackHandler { mostrarConfiguracion = false }
@@ -70,10 +71,29 @@ class MainActivity : ComponentActivity() {
                         onCerrar = { mostrarConfiguracion = false },
                     )
                 } else {
-                    PanelScreen(
-                        viewModel = viewModel,
-                        onAbrirConfiguracion = { mostrarConfiguracion = true },
-                    )
+                    when (seccion) {
+                        SeccionPrincipal.TAREAS -> {
+                            val viewModel: PanelViewModel = viewModel(
+                                factory = PanelViewModel.fabrica(contenedor),
+                            )
+                            PanelScreen(
+                                viewModel = viewModel,
+                                onAbrirConfiguracion = { mostrarConfiguracion = true },
+                                onNavegar = { seccion = it },
+                            )
+                        }
+
+                        SeccionPrincipal.PESO -> {
+                            val pesoViewModel: PesoViewModel = viewModel(
+                                factory = PesoViewModel.fabrica(contenedor),
+                            )
+                            PesoScreen(
+                                viewModel = pesoViewModel,
+                                onAbrirConfiguracion = { mostrarConfiguracion = true },
+                                onNavegar = { seccion = it },
+                            )
+                        }
+                    }
                 }
             }
         }

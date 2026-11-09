@@ -18,7 +18,7 @@ data class TareaRecurrente(
     /** Si las tareas generadas por esta rutina usan Pomodoro. */
     val usarPomodoro: Boolean = false,
     /** Hora del recordatorio. `null` significa que la rutina no avisa. */
-    val horaRecordatorio: LocalTime? = LocalTime.of(9, 0),
+    val horaRecordatorio: LocalTime? = null,
     val creadaEn: Long = System.currentTimeMillis(),
 ) {
     val tieneTemporizador: Boolean
